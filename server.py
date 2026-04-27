@@ -1,6 +1,5 @@
 """
-Sports Analysis MCP Server
-Fixed for Render.com — binds to 0.0.0.0 so Render can detect the port.
+Sports Analysis MCP Server - Fixed for Render.com
 """
 
 import httpx
@@ -313,4 +312,5 @@ async def search_league(sport: str, country: str = "") -> str:
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     app = mcp.streamable_http_app()
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # allow_hosts fixes the "Invalid Host header" error on Render
+    uvicorn.run(app, host="0.0.0.0", port=port, forwarded_allow_ips="*", proxy_headers=True)
