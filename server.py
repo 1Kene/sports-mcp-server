@@ -1,17 +1,18 @@
 """
-Sports Analysis MCP Server - Minimal, Render-compatible
+Sports Analysis MCP Server - Fixed for Render.com
 """
 import httpx
 import os
 import json
+import uvicorn
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Sports Analysis Server")
 
-API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
-AF_BASE = "https://v3.football.api-sports.io"
 SDB_BASE = "https://www.thesportsdb.com/api/v1/json/3"
 OL_BASE  = "https://api.openligadb.de"
+AF_BASE  = "https://v3.football.api-sports.io"
+API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
 
 
 @mcp.tool()
@@ -24,10 +25,8 @@ async def search_team(team_name: str) -> str:
             return f"No team found for '{team_name}'."
         t = teams[0]
         return json.dumps({
-            "name": t.get("strTeam"),
-            "country": t.get("strCountry"),
-            "league": t.get("strLeague"),
-            "founded": t.get("intFormedYear"),
+            "name": t.get("strTeam"), "country": t.get("strCountry"),
+            "league": t.get("strLeague"), "founded": t.get("intFormedYear"),
             "stadium": t.get("strStadium"),
             "description": (t.get("strDescriptionEN") or "")[:500],
         }, indent=2)
@@ -48,8 +47,7 @@ async def get_team_last_matches(team_name: str) -> str:
         for e in events[:5]:
             results.append({
                 "date": e.get("dateEvent"),
-                "home": e.get("strHomeTeam"),
-                "away": e.get("strAwayTeam"),
+                "home": e.get("strHomeTeam"), "away": e.get("strAwayTeam"),
                 "score": f"{e.get('intHomeScore')} - {e.get('intAwayScore')}",
                 "league": e.get("strLeague"),
             })
@@ -70,12 +68,9 @@ async def get_team_next_matches(team_name: str) -> str:
         results = []
         for e in events[:5]:
             results.append({
-                "date": e.get("dateEvent"),
-                "time": e.get("strTime"),
-                "home": e.get("strHomeTeam"),
-                "away": e.get("strAwayTeam"),
-                "league": e.get("strLeague"),
-                "venue": e.get("strVenue"),
+                "date": e.get("dateEvent"), "time": e.get("strTime"),
+                "home": e.get("strHomeTeam"), "away": e.get("strAwayTeam"),
+                "league": e.get("strLeague"), "venue": e.get("strVenue"),
             })
         return json.dumps(results, indent=2)
 
@@ -90,12 +85,9 @@ async def search_player(player_name: str) -> str:
             return f"No player found for '{player_name}'."
         p = players[0]
         return json.dumps({
-            "name": p.get("strPlayer"),
-            "sport": p.get("strSport"),
-            "team": p.get("strTeam"),
-            "nationality": p.get("strNationality"),
-            "position": p.get("strPosition"),
-            "date_of_birth": p.get("dateBorn"),
+            "name": p.get("strPlayer"), "sport": p.get("strSport"),
+            "team": p.get("strTeam"), "nationality": p.get("strNationality"),
+            "position": p.get("strPosition"), "date_of_birth": p.get("dateBorn"),
             "height": p.get("strHeight"),
             "description": (p.get("strDescriptionEN") or "")[:500],
         }, indent=2)
@@ -103,15 +95,14 @@ async def search_player(player_name: str) -> str:
 
 @mcp.tool()
 async def get_league_table(league_name: str) -> str:
-    """Get standings for Bundesliga (always free) or other leagues with API key."""
+    """Get standings for Bundesliga (free) or other leagues with API key."""
     league_lower = league_name.lower()
     if "bundesliga" in league_lower:
         league_key = "bl2" if "2" in league_lower else "bl1"
         async with httpx.AsyncClient() as client:
             r = await client.get(f"{OL_BASE}/getbltable/{league_key}/2024")
-            table = r.json()
             rows = []
-            for i, t in enumerate(table[:10], 1):
+            for i, t in enumerate(r.json()[:10], 1):
                 rows.append({
                     "pos": i, "team": t.get("teamName"),
                     "played": t.get("matches"), "won": t.get("won"),
@@ -119,7 +110,7 @@ async def get_league_table(league_name: str) -> str:
                     "gd": t.get("goalDiff"), "points": t.get("points"),
                 })
             return json.dumps(rows, indent=2)
-    return "Add API_FOOTBALL_KEY env var on Render for Premier League etc. Bundesliga works free."
+    return "Bundesliga works free. Add API_FOOTBALL_KEY on Render for other leagues."
 
 
 @mcp.tool()
@@ -193,4 +184,5 @@ async def get_cricket_team_results(team_name: str) -> str:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+    app = mcp.streamable_http_app()
+    uvicorn.run(app, host="0.0.0.0", port=port)
