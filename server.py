@@ -1,11 +1,14 @@
 """
-Sports Analysis MCP Server - Fixed for Render.com
+Sports Analysis MCP Server
+Uses Starlette directly to avoid Render host-header issues.
 """
 
 import httpx
 import os
 import json
 import uvicorn
+from starlette.applications import Starlette
+from starlette.routing import Mount
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Sports Analysis Server")
@@ -131,9 +134,8 @@ async def get_league_table(league_name: str) -> str:
             return json.dumps(rows, indent=2)
 
     if not API_FOOTBALL_KEY:
-        return ("API-Football key not set. Add API_FOOTBALL_KEY env var on Render "
-                "for Premier League, La Liga, Serie A, etc. "
-                "Bundesliga works without a key.")
+        return ("API-Football key not set. Bundesliga works without a key. "
+                "Add API_FOOTBALL_KEY on Render for other leagues.")
 
     league_ids = {
         "premier league": 39, "la liga": 140,
@@ -151,8 +153,7 @@ async def get_league_table(league_name: str) -> str:
         )
         data = r.json()
         table = ((data.get("response") or [{}])[0]
-                 .get("league", {})
-                 .get("standings") or [[]])[0]
+                 .get("league", {}).get("standings") or [[]])[0]
         rows = []
         for t in table[:10]:
             rows.append({
@@ -311,6 +312,14 @@ async def search_league(sport: str, country: str = "") -> str:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    app = mcp.streamable_http_app()
-    # allow_hosts fixes the "Invalid Host header" error on Render
-    uvicorn.run(app, host="0.0.0.0", port=port, forwarded_allow_ips="*", proxy_headers=True)
+    # Wrap MCP app in Starlette with root_path for Render's reverse proxy
+    mcp_app = mcp.streamable_http_app()
+    app = Starlette(routes=[Mount("/", app=mcp_app)])
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+        server_header=False,
+    )
