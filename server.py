@@ -1,13 +1,20 @@
 """
-Sports Analysis MCP Server - Fixed for Render.com
+Sports Analysis MCP Server - DNS rebinding protection disabled for Render
 """
 import httpx
 import os
 import json
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
-mcp = FastMCP("Sports Analysis Server")
+# Disable DNS rebinding protection so Render's domain is accepted
+mcp = FastMCP(
+    "Sports Analysis Server",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
+)
 
 SDB_BASE = "https://www.thesportsdb.com/api/v1/json/3"
 OL_BASE  = "https://api.openligadb.de"
